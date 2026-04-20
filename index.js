@@ -7,6 +7,7 @@ const {
 
 const pino = require("pino")
 const qrcode = require("qrcode-terminal")
+const cron = require("node-cron") // npm i node-cron
 
 const BOT_NAME = "KYC BOT 🔥"
 
@@ -19,6 +20,9 @@ const delay = ms => new Promise(res => setTimeout(res, ms))
 const userMessages = new Map()
 
 global.messageStore = {}
+
+// 🚦 Control flags ili isirudie tag
+let isMorningTagging = false
 
 async function startBot() {
 
@@ -34,24 +38,36 @@ async function startBot() {
 
     sock.ev.on("creds.update", saveCreds)
 
-    // ================= CONNECTION + QR =================
-    sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
+    let isConnected = false
 
-        if (qr) {
-            console.log("📲 SCAN QR HAPA 👇")
-            qrcode.generate(qr, { small: true })
-        }
+sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
 
-        if (connection === "open") {
-            console.log("🔥 KYC BOT ONLINE NA INAENDELEA KUFANYA KAZI KWA UIMARA MKUBWA 🔥")
-        }
+    if (qr) {
+        console.log("📲 SCAN QR HAPA 👇")
+        qrcode.generate(qr, { small: true })
+    }
 
-        if (connection === "close") {
-            if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-                setTimeout(startBot, 3000)
-            }
+    if (connection === "open") {
+        if (isConnected) return
+        isConnected = true
+
+        console.clear() // 👉 hii inaondoa spam zote za terminal
+        console.log("🔥 KYC BOT ONLINE NA INAENDELEA KUFANYA KAZI KWA UIMARA MKUBWA 🔥")
+    }
+
+    if (connection === "close") {
+        isConnected = false
+
+        if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+            setTimeout(startBot, 3000)
         }
-    })
+    }
+})
+
+    // 🌅 MORNING AUTO MESSAGE - Saa 6:00 asubuhi EAT
+    cron.schedule("0 6 * * *", async () => {
+        await runMorningTag(sock)
+    }, { timezone: "Africa/Dar_es_Salaam" })
 
     // ================= MESSAGE HANDLER =================
     sock.ev.on("messages.upsert", async ({ messages }) => {
@@ -94,7 +110,7 @@ async function startBot() {
                 text:
 `🔥 KYC BOT ONLINE NA INAFANYA KAZI KWA UFANISI WA JUU SANA 🔥
 
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━
 📌 SYSTEM STATUS: ACTIVE & STABLE
 🛡️ PROTECTION: ENABLED FULLY
 ⚡ SPEED: ULTRA FAST RESPONSE
@@ -111,11 +127,11 @@ async function startBot() {
 
             return sock.sendMessage(from, {
                 text:
-`📌📌 MAELEZO YA GROUP 📌📌
-━━━━━━━━━━━━━━━━━━
+`📌 MAELEZO YA GROUP 📌📌
+━━━━━━━━━━━━━━
 📝 ${desc}
 
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🤖 KYC BOT INFO SYSTEM ACTIVE
 
 ⚡ Mfumo wa maelezo ya group unafanya kazi kikamilifu
@@ -138,7 +154,7 @@ async function startBot() {
 
             return sock.sendMessage(from, {
                 text:
-`➕➕ MEMBER AMEONGEZWA KWA MAFANIKIO MAKUBWA ➕➕
+`➕ MEMBER AMEONGEZWA KWA MAFANIKIO MAKUBWA ➕➕
 
 📌 STATUS: OPERATION SUCCESSFUL
 ⚡ SYSTEM: KYC BOT GROUP MANAGEMENT ENGINE
@@ -162,7 +178,7 @@ async function startBot() {
 
             return sock.sendMessage(from, {
                 text:
-`➖➖ MEMBER AMEONDOLEWA KWA UDHIBITI WA JUU ➖➖
+`➖ MEMBER AMEONDOLEWA KWA UDHIBITI WA JUU ➖➖
 
 📌 STATUS: EXECUTION COMPLETE
 🛡️ SYSTEM: GROUP SECURITY ENGINE
@@ -233,7 +249,7 @@ async function startBot() {
 
         const g = userMessages.get(from)
 
-        if (g.lastSender !== sender) {
+        if (g.lastSender!== sender) {
             g.lastSender = sender
             g.count = 1
             g.keys = [m.key]
@@ -248,7 +264,7 @@ async function startBot() {
                 text:
 `⚠️ ONYO KALI LA KWANZA ⚠️
 
-📌 UMECHUKUA HATUA YA SPAM YA MESSAGES MFULULIZO
+📌 UMECHUKUA HATUA YA SPAM YA MESSAGES MFULIZO
 🚨 TAFADHALI ACHA KUTUMA MESSAGES NYINGI KWA MPIGO
 
 🛡️ KYC BOT INAANGALIA USALAMA WA GROUP KWA UANGALIFU MKUBWA`,
@@ -267,7 +283,7 @@ async function startBot() {
                 text:
 `🚫 UMEONDOLEWA KWA SPAM 🚫
 
-📌 SABABU: MESSAGES NYINGI MFULULIZO
+📌 SABABU: MESSAGES NYINGI MFULIZO
 🛡️ SYSTEM: AUTOMATIC SECURITY ENGINE
 ⚡ ACTION: REMOVAL EXECUTED
 
@@ -291,7 +307,7 @@ async function startBot() {
 
 👉 JINSI YA KUTUMIA:
 1. Reply message ya member
-2. Andika .del
+2. Andika.del
 3. Bot itafuta message hiyo mara moja
 
 ⚡ Mfumo huu unahakikisha udhibiti wa moja kwa moja wa admin`,
@@ -400,4 +416,63 @@ async function startBot() {
     })
 }
 
-startBot()
+// 🌅 MORNING TAG FUNCTION - Saa 12:00 asubuhi
+async function runMorningTag(sock) {
+    try {
+        const chats = Object.keys(await sock.groupFetchAllParticipating())
+        if (chats.length === 0) return
+
+        for (const groupId of chats) {
+            if (isMorningTagging) continue
+            isMorningTagging = true
+
+            const groupMetadata = await sock.groupMetadata(groupId)
+            const participants = groupMetadata.participants.map(p => p.id).slice(0, 30)
+
+            // 🌅 ROUND 1 - Tag watu 30 kwa kushusha moja
+            let tagText = ""
+            let mentions = []
+            for (const participant of participants) {
+                tagText += `🌸 @${participant.split("@")[0]}\n`
+                mentions.push(participant)
+            }
+
+            await sock.sendMessage(groupId, {
+                text: `🌅✨🌟 *SIKU NYINGINE LOVE MATCH ZONE* 🌟✨🌅\n\n${tagText}\n` +
+                      `☀️💙 Good morning group natumaini mko salama 🙏💎\n` +
+                      `✨ Tuamke na tukumbuke kutoa shukrani kwa Mungu wetu kwa kutufikisha siku nyingine tukiwa wazima. 🙏🌹\n\n` +
+                      `💎 KYC BOT - LOVE MATCH ZONE PREMIUM 💎✨\n` +
+                      `🌸 Siku njema na baraka nyingi kwa wote 💙`,
+                mentions: mentions
+            })
+
+            // ⏳ Dakika 1 kisha tag wote kwa kushusha moja
+            setTimeout(async () => {
+                try {
+                    const allParticipants = groupMetadata.participants.map(p => p.id)
+                    let allTags = ""
+                    for (const p of allParticipants) {
+                        allTags += `🌸 @${p.split("@")[0]}\n`
+                    }
+
+                    await sock.sendMessage(groupId, {
+                        text: `🌅✨🌟 *MORNING TAG - FINAL ROUND* 🌟✨🌅\n\n${allTags}\n` +
+                              `💙🌟 WOTE NILIKUA NAWASALIMIA LOVE MATCH ZONE ISONGE MBELE 💙🌟\n` +
+                              `🌹 by BEST AI KWA NIABA YA BOSS WANGU KYC NAWAPENDA WOTE 💎✨\n\n` +
+                              `🙏 Asante kwa kuwa sehemu ya familia yetu nzuri 💙🌸`,
+                        mentions: allParticipants
+                    })
+                    isMorningTagging = false
+                } catch (err) {
+                    console.log("❌ Error in morning tag round 2:", err.message)
+                    isMorningTagging = false
+                }
+            }, 60000) // dakika 1
+        }
+    } catch (err) {
+        console.log("❌ Error in morning tag:", err.message)
+        isMorningTagging = false
+    }
+}
+
+startBot().catch(err => console.log("❌ Fatal error:", err))

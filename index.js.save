@@ -1,0 +1,230 @@
+
+        const g = userMessages.get(from)
+
+        if (g.lastSender!== sender) {
+            g.lastSender = sender
+            g.count = 1
+            g.keys = [m.key]
+            return
+        }
+
+        g.count++
+        g.keys.push(m.key)
+
+        if (g.count === 30) {
+            return sock.sendMessage(from, {
+                text:
+`⚠️ ONYO KALI LA KWANZA ⚠️
+
+📌 UMECHUKUA HATUA YA SPAM YA MESSAGES MFULIZO
+🚨 TAFADHALI ACHA KUTUMA MESSAGES NYINGI KWA MPIGO
+
+🛡️ KYC BOT INAANGALIA USALAMA WA GROUP KWA UANGALIFU MKUBWA`,
+            }, { quoted: m })
+        }
+
+        if (g.count === 50) {
+
+            for (let k of g.keys) {
+                await sock.sendMessage(from, { delete: k }).catch(() => {})
+            }
+
+            await sock.groupParticipantsUpdate(from, [sender], "remove").catch(() => {})
+
+            return sock.sendMessage(from, {
+                text:
+`🚫 UMEONDOLEWA KWA SPAM 🚫
+
+📌 SABABU: MESSAGES NYINGI MFULIZO
+🛡️ SYSTEM: AUTOMATIC SECURITY ENGINE
+⚡ ACTION: REMOVAL EXECUTED
+
+💚 Hii ni hatua ya kulinda group dhidi ya usumbufu`,
+            })
+        }
+
+        // ================= NEW DELETE SYSTEM (ADDED ONLY) =================
+
+        // 1. DEL reply delete
+        if (isGroup && msg === ".del") {
+
+            if (!(await isAdmin())) return
+
+            const quoted = m.message?.extendedTextMessage?.contextInfo
+
+            if (!quoted) {
+                return sock.sendMessage(from, {
+                    text:
+`📌 SYSTEM YA KUFUTA MESSAGE MOJA (REPLY MODE)
+
+👉 JINSI YA KUTUMIA:
+1. Reply message ya member
+2. Andika.del
+3. Bot itafuta message hiyo mara moja
+
+⚡ Mfumo huu unahakikisha udhibiti wa moja kwa moja wa admin`,
+                }, { quoted: m })
+            }
+
+            await sock.sendMessage(from, {
+                delete: {
+                    remoteJid: from,
+                    fromMe: false,
+                    id: quoted.stanzaId,
+                    participant: quoted.participant
+                }
+            }).catch(() => {})
+
+            return sock.sendMessage(from, {
+                text:
+`🧹 MESSAGE IMEFUTWA KWA MAFANIKIO MAKUBWA 🧹
+
+📌 MODE: SINGLE DELETE
+⚡ STATUS: SUCCESS
+🛡️ SYSTEM: KYC BOT CONTROL ENGINE`,
+            })
+        }
+
+        // 2. MULTI DELETE
+        if (isGroup && msg.startsWith(".del ")) {
+
+            if (!(await isAdmin())) return
+
+            const parts = msg.split(" ")
+            const count = parseInt(parts[1]) || 1
+            const target = parts[2]
+
+            if (!target) {
+                return sock.sendMessage(from, {
+                    text:
+`📌 SYSTEM YA KUFUTA MESSAGES NYINGI
+
+👉 FORMAT:
+.del 5 @user
+
+⚡ Hii system inaruhusu kufuta messages nyingi za user mmoja kwa udhibiti wa admin`,
+                }, { quoted: m })
+            }
+
+            const jid = target.replace("@", "") + "@s.whatsapp.net"
+
+            const msgs = (global.messageStore[from] || []).filter(x => x.sender === jid)
+            const lastMsgs = msgs.slice(-count)
+
+            for (let x of lastMsgs) {
+                await sock.sendMessage(from, { delete: x.key }).catch(() => {})
+            }
+
+            return sock.sendMessage(from, {
+                text:
+`🧹 MESSAGES ZIMEFUTWA KWA UFAFANUZI MKUBWA 🧹
+
+📌 USER: ${target}
+📌 COUNT: ${count}
+
+⚡ SYSTEM: BULK DELETE ENGINE
+🛡️ RESULT: SUCCESSFUL EXECUTION`,
+            })
+        }
+
+        // 3. DELETE ALL
+        if (isGroup && msg.startsWith(".delall")) {
+
+            if (!(await isAdmin())) return
+
+            const target = msg.split(" ")[1]
+
+            if (!target) {
+                return sock.sendMessage(from, {
+                    text:
+`📌 SYSTEM YA KUFUTA MESSAGES ZOTE ZA USER
+
+👉 FORMAT:
+.delall @user
+
+⚡ Hii itafuta kila message ya user husika iliyohifadhiwa kwenye system`,
+                }, { quoted: m })
+            }
+
+            const jid = target.replace("@", "") + "@s.whatsapp.net"
+
+            const msgs = (global.messageStore[from] || []).filter(x => x.sender === jid)
+
+            for (let x of msgs) {
+                await sock.sendMessage(from, { delete: x.key }).catch(() => {})
+            }
+
+            return sock.sendMessage(from, {
+                text:
+`🧹 MESSAGES ZOTE ZIMEFUTWA KIKAMILIFU 🧹
+
+📌 USER: ${target}
+
+⚡ SYSTEM: FULL CLEANUP ENGINE
+🛡️ RESULT: COMPLETE SUCCESS`,
+            })
+        }
+
+    })
+}
+
+// 🌅 MORNING TAG FUNCTION - Saa 12:00 asubuhi
+async function runMorningTag(sock) {
+    try {
+        const chats = Object.keys(await sock.groupFetchAllParticipating())
+        if (chats.length === 0) return
+
+        for (const groupId of chats) {
+            if (isMorningTagging) continue
+            isMorningTagging = true
+
+            const groupMetadata = await sock.groupMetadata(groupId)
+            const participants = groupMetadata.participants.map(p => p.id).slice(0, 30)
+
+            // 🌅 ROUND 1 - Tag watu 30 kwa kushusha moja
+            let tagText = ""
+            let mentions = []
+            for (const participant of participants) {
+                tagText += `🌸 @${participant.split("@")[0]}\n`
+                mentions.push(participant)
+            }
+
+            await sock.sendMessage(groupId, {
+                text: `🌅✨🌟 *SIKU NYINGINE LOVE MATCH ZONE* 🌟✨🌅\n\n${tagText}\n` +
+                      `☀️💙 Good morning group natumaini mko salama 🙏💎\n` +
+                      `✨ Tuamke na tukumbuke kutoa shukrani kwa Mungu wetu kwa kutufikisha siku nyingine tukiwa wazima. 🙏🌹\n\n` +
+                      `💎 KYC BOT - LOVE MATCH ZONE PREMIUM 💎✨\n` +
+                      `🌸 Siku njema na baraka nyingi kwa wote 💙`,
+                mentions: mentions
+            })
+
+            // ⏳ Dakika 1 kisha tag wote kwa kushusha moja
+            setTimeout(async () => {
+                try {
+                    const allParticipants = groupMetadata.participants.map(p => p.id)
+                    let allTags = ""
+                    for (const p of allParticipants) {
+                        allTags += `🌸 @${p.split("@")[0]}\n`
+                    }
+
+                    await sock.sendMessage(groupId, {
+                        text: `🌅✨🌟 *MORNING TAG - FINAL ROUND* 🌟✨🌅\n\n${allTags}\n` +
+                              `💙🌟 WOTE NILIKUA NAWASALIMIA LOVE MATCH ZONE ISONGE MBELE 💙🌟\n` +
+                              `🌹 by BEST AI KWA NIABA YA BOSS WANGU KYC NAWAPENDA WOTE 💎✨\n\n` +
+                              `🙏 Asante kwa kuwa sehemu ya familia yetu nzuri 💙🌸`,
+                        mentions: allParticipants
+                    })
+                    isMorningTagging = false
+                } catch (err) {
+                    console.log("❌ Error in morning tag round 2:", err.message)
+                    isMorningTagging = false
+                }
+            }, 60000) // dakika 1
+        }
+    } catch (err) {
+        console.log("❌ Error in morning tag:", err.message)
+        isMorningTagging = false
+    }
+}
+
+startBot().catch(err => console.log("❌ Fatal error:", err))
