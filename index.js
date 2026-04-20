@@ -21,7 +21,7 @@ const userMessages = new Map()
 
 global.messageStore = {}
 
-// 🚦 Control flags ili isirudie tag
+// 🚦 Control flag ili isirudie tag
 let isMorningTagging = false
 
 async function startBot() {
@@ -30,41 +30,34 @@ async function startBot() {
     const { version } = await fetchLatestBaileysVersion()
 
     sock = makeWASocket({
-        version,
-        auth: state,
-        logger: pino({ level: "silent" }),
-        browser: [BOT_NAME, "Chrome", "1.0"]
-    })
+    version,
+    auth: state,
+    logger: pino({ level: "fatal" }), // hapa
+    browser: [BOT_NAME, "Chrome", "1.0"]
+})
 
     sock.ev.on("creds.update", saveCreds)
 
-    let isConnected = false
+    // ================= CONNECTION + QR =================
+    sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
 
-sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
-
-    if (qr) {
-        console.log("📲 SCAN QR HAPA 👇")
-        qrcode.generate(qr, { small: true })
-    }
-
-    if (connection === "open") {
-        if (isConnected) return
-        isConnected = true
-
-        console.clear() // 👉 hii inaondoa spam zote za terminal
-        console.log("🔥 KYC BOT ONLINE NA INAENDELEA KUFANYA KAZI KWA UIMARA MKUBWA 🔥")
-    }
-
-    if (connection === "close") {
-        isConnected = false
-
-        if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-            setTimeout(startBot, 3000)
+        if (qr) {
+            console.log("📲 SCAN QR HAPA 👇")
+            qrcode.generate(qr, { small: true })
         }
-    }
-})
 
-    // 🌅 MORNING AUTO MESSAGE - Saa 6:00 asubuhi EAT
+        if (connection === "open") {
+            console.log("🔥 KYC BOT ONLINE NA INAENDELEA KUFANYA KAZI KWA UIMARA MKUBWA 🔥")
+        }
+
+        if (connection === "close") {
+            if (lastDisconnect?.error?.output?.statusCode!== DisconnectReason.loggedOut) {
+                setTimeout(startBot, 3000)
+            }
+        }
+    })
+
+    // 🌅 MORNING TAG - Saa 6:00 asubuhi EAT - FIXED CRON FORMAT
     cron.schedule("0 6 * * *", async () => {
         await runMorningTag(sock)
     }, { timezone: "Africa/Dar_es_Salaam" })
@@ -110,7 +103,7 @@ sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
                 text:
 `🔥 KYC BOT ONLINE NA INAFANYA KAZI KWA UFANISI WA JUU SANA 🔥
 
-━━━━━━━━━━━━
+━━━━━━━━━━
 📌 SYSTEM STATUS: ACTIVE & STABLE
 🛡️ PROTECTION: ENABLED FULLY
 ⚡ SPEED: ULTRA FAST RESPONSE
@@ -128,10 +121,10 @@ sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
             return sock.sendMessage(from, {
                 text:
 `📌 MAELEZO YA GROUP 📌📌
-━━━━━━━━━━━━━━
+━━━━━━━━━━
 📝 ${desc}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━
 🤖 KYC BOT INFO SYSTEM ACTIVE
 
 ⚡ Mfumo wa maelezo ya group unafanya kazi kikamilifu
@@ -416,63 +409,67 @@ sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
     })
 }
 
-// 🌅 MORNING TAG FUNCTION - Saa 12:00 asubuhi
+// 🌅 MORNING TAG FUNCTION - Saa 6:00 asubuhi - FIXED LOGIC
 async function runMorningTag(sock) {
+    if (isMorningTagging) return // FIX #2: Return badala ya continue
+    isMorningTagging = true
+
     try {
         const chats = Object.keys(await sock.groupFetchAllParticipating())
-        if (chats.length === 0) return
+        if (chats.length === 0) {
+            isMorningTagging = false
+            return
+        }
 
         for (const groupId of chats) {
-            if (isMorningTagging) continue
-            isMorningTagging = true
-
             const groupMetadata = await sock.groupMetadata(groupId)
-            const participants = groupMetadata.participants.map(p => p.id).slice(0, 30)
+            const participants = groupMetadata.participants.map(p => p.id)
+            const totalMembers = participants.length
+            let taggedCount = 0
 
-            // 🌅 ROUND 1 - Tag watu 30 kwa kushusha moja
-            let tagText = ""
-            let mentions = []
-            for (const participant of participants) {
-                tagText += `🌸 @${participant.split("@")[0]}\n`
-                mentions.push(participant)
-            }
-
+            // SALAM YA KUANZA
             await sock.sendMessage(groupId, {
-                text: `🌅✨🌟 *SIKU NYINGINE LOVE MATCH ZONE* 🌟✨🌅\n\n${tagText}\n` +
-                      `☀️💙 Good morning group natumaini mko salama 🙏💎\n` +
-                      `✨ Tuamke na tukumbuke kutoa shukrani kwa Mungu wetu kwa kutufikisha siku nyingine tukiwa wazima. 🙏🌹\n\n` +
-                      `💎 KYC BOT - LOVE MATCH ZONE PREMIUM 💎✨\n` +
-                      `🌸 Siku njema na baraka nyingi kwa wote 💙`,
-                mentions: mentions
+                text: `☀️✨ *SALAM KWA WANA GROUP WOTE TAG INAANZA KAMA IFATAVYO* ✨☀️\n\n💎 Kila tagi ina watu 15 tu bila kuzidisha`
             })
 
-            // ⏳ Dakika 1 kisha tag wote kwa kushusha moja
-            setTimeout(async () => {
-                try {
-                    const allParticipants = groupMetadata.participants.map(p => p.id)
-                    let allTags = ""
-                    for (const p of allParticipants) {
-                        allTags += `🌸 @${p.split("@")[0]}\n`
-                    }
+            // TAG RUNDI KWA RUNDI - 15 KWA 15
+            while (taggedCount < totalMembers) {
+                const batch = participants.slice(taggedCount, taggedCount + 15)
+                if (batch.length === 0) break
 
-                    await sock.sendMessage(groupId, {
-                        text: `🌅✨🌟 *MORNING TAG - FINAL ROUND* 🌟✨🌅\n\n${allTags}\n` +
-                              `💙🌟 WOTE NILIKUA NAWASALIMIA LOVE MATCH ZONE ISONGE MBELE 💙🌟\n` +
-                              `🌹 by BEST AI KWA NIABA YA BOSS WANGU KYC NAWAPENDA WOTE 💎✨\n\n` +
-                              `🙏 Asante kwa kuwa sehemu ya familia yetu nzuri 💙🌸`,
-                        mentions: allParticipants
-                    })
-                    isMorningTagging = false
-                } catch (err) {
-                    console.log("❌ Error in morning tag round 2:", err.message)
-                    isMorningTagging = false
+                let tagText = ""
+                for (const participant of batch) {
+                    tagText += `💫 @${participant.split("@")[0]}\n`
                 }
-            }, 60000) // dakika 1
+
+                await sock.sendMessage(groupId, {
+                    text: `${tagText}\n☀️💙 Good morning group natumaini mko salama 🙏\n✨ Tuamke tukumbuke kutoa shukrani kwa Mungu wetu kwa kutufikisha siku nyingine tukiwa wazima 🙏🔥`, // FIX #3: 🌹 -> 🔥
+                    mentions: batch
+                })
+
+                taggedCount += batch.length
+
+                // Subiri dakika 1 kabla ya rundi linalofuata
+                if (taggedCount < totalMembers) {
+                    await delay(60000) // dakika 1 = 60000ms
+                }
+            }
+
+            // MWISHO WA TAGALL
+            await sock.sendMessage(groupId, {
+                text: `🌅✨ *TAGALL YA SALAAM ZA ASUBUHI IMEISHIA HAPA* ✨🌅\n\n` +
+                      `💙 Wote natumanini wazima wa afya 🙏\n` +
+                      `💎 by KYC BOT system LOVE MATCH ZONE\n` +
+                      `🌟 Tunawapenda sana love match zone\n` +
+                      `☀️ Nawatakia Asubuhi njema nyote 💙✨`
+            })
         }
     } catch (err) {
         console.log("❌ Error in morning tag:", err.message)
-        isMorningTagging = false
+    } finally {
+        isMorningTagging = false // Hakikisha inareset hata kama kuna error
     }
 }
 
 startBot().catch(err => console.log("❌ Fatal error:", err))
+
