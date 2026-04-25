@@ -194,9 +194,9 @@ sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
         console.log("🔥 BOT ONLINE - PRODUCTION READY")
         console.log(`${B8}\n🔥 KYC BOT SYSTEM ACTIVE 24/7 🔥\n${B8}`)
 
-        // CRON PATTERN SAHI 5 FIELDS
-        cron.schedule("0 6 *", async () => {
-            const groups = await sock.groupFetchAllParticipating() || {}
+        // CRON PATTERN SAHI 5 FIELDS - minute hour day month weekday
+        cron.schedule("0 6 * * *", async () => {
+            const groups = await sock.groupFetchAllParticipating()
             for (let id in groups) {
                 await morningTagAll(id)
                 await sleep(4000)
@@ -211,7 +211,7 @@ sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
             setTimeout(startBot, 5000)
         }
     }
-})
+}) // END OF CONNECTION UPDATE - HII NDIO ILIOKUWA YA ZIADA
 
 // ================= MESSAGE HANDLER =================
 sock.ev.on("messages.upsert", async ({ messages }) => {
@@ -393,7 +393,7 @@ if (isGroup && msg === "maelezo") {
 
         return sock.sendMessage(from, {
             text: `${B7}\n📝 MAELEZO YA GROUP 📝\n${B7}\n\n${desc}\n\n${B5}
-💚 KYC BOT DESCRIPTION SYSTEM ACTIVE 💚
+💎 KYC BOT DESCRIPTION SYSTEM ACTIVE 💎
 ${B5}
 
 ${LINE}
@@ -690,4 +690,3 @@ ${LINE}`
 } // END OF STARTBOT FUNCTION
 
 startBot() // START THE BOT
-// update
