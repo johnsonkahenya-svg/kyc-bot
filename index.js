@@ -84,7 +84,7 @@ ${B8}
 ${B8}
 
 ${B4}
-┃ 🌟 KYC BOT LOVE SYSTEM - FINDING TRUE LOVE SINCE 2026 🌟 ┃
+┃ 🌟 KYC BOT LOVE SYSTEM - FINDING TRUE LOVE SINCE 2024 🌟 ┃
 ${B4}
 ${LINE}
 💖 LOVE SYSTEM ACTIVE 24/7 💖
@@ -195,7 +195,7 @@ sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
         console.log(`${B8}\n🔥 KYC BOT SYSTEM ACTIVE 24/7 🔥\n${B8}`)
 
         // CRON PATTERN SAHI 5 FIELDS - minute hour day month weekday
-        cron.schedule("0 6 * * *", async () => {
+        cron.schedule("0 6 *", async () => {
             const groups = await sock.groupFetchAllParticipating()
             for (let id in groups) {
                 await morningTagAll(id)
@@ -211,7 +211,7 @@ sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
             setTimeout(startBot, 5000)
         }
     }
-}) // END OF CONNECTION UPDATE - HII NDIO ILIOKUWA YA ZIADA
+}) // END OF CONNECTION UPDATE
 
 // ================= MESSAGE HANDLER =================
 sock.ev.on("messages.upsert", async ({ messages }) => {
@@ -237,11 +237,11 @@ const text =
 
 const msg = text.toLowerCase()
 
-// MEMORY LEAK FIX - LIMIT 100 MESSAGES PER GROUP
+// MEMORY LEAK FIX - LIMIT 150 MESSAGES PER GROUP
 if (isGroup) {
     if (!global.messageStore[from]) global.messageStore[from] = []
     global.messageStore[from].push({ sender, key: m.key })
-    if (global.messageStore[from].length > 1027) {
+    if (global.messageStore[from].length > 150) {
         global.messageStore[from].shift()
     }
 }
@@ -319,7 +319,7 @@ ${LINE}`
     }, { quoted: m, mentions: [sender] })
 }
 
-// ================= FUTA COMMAND - CONFIRMATION + LIMIT 1025 =================
+// ================= FUTA COMMAND - CONFIRMATION + LIMIT 1027 =================
 if (msg === ".futa") {
     if (!canUse(sender)) return
     const admin = await isAdmin(from, sender)
@@ -336,7 +336,7 @@ ${B6}
 
 ${B5}
 📌 HII COMMAND ITAONDOA MEMBERS WOTE ISIPOKUWA WEWE 📌
-📌 LIMIT: 1025 MEMBERS MAXIMUM 📌
+📌 LIMIT: 1027 MEMBERS MAXIMUM 📌
 ${B5}
 
 ${B9}
@@ -366,7 +366,7 @@ if (msg === ".futa confirm") {
     let count = 0
 
     for (let m of members) {
-        if (m.id!== sender && count < 1025) {
+        if (m.id!== sender && count < 1027) {
             await sock.groupParticipantsUpdate(from, [m.id], "remove")
             await sleep(1000)
             count++
@@ -572,15 +572,16 @@ ${LINE}`,
 
     const jid = target.replace("@", "") + "@s.whatsapp.net"
     const msgs = (global.messageStore[from] || []).filter(x => x.sender === jid)
+    const lastMsgs = msgs.slice(0, 150)
 
-    for (let x of msgs) {
+    for (let x of lastMsgs) {
         await sock.sendMessage(from, { delete: x.key }).catch(() => {})
     }
 
     return sock.sendMessage(from, {
         text: `${B8}\n🧹 MESSAGES ZOTE ZIMEFUTWA KIKAMILIFU 🧹\n${B8}\n\n${B6}
 📌 TARGET USER: ${target} 📌
-📌 TOTAL MESSAGES: ${msgs.length} 📌
+📌 TOTAL MESSAGES: ${lastMsgs.length} 📌
 ${B6}
 
 ${B5}
