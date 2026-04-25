@@ -84,7 +84,7 @@ ${B8}
 ${B8}
 
 ${B4}
-┃ 🌟 KYC BOT LOVE SYSTEM - FINDING TRUE LOVE SINCE 2024 🌟 ┃
+┃ 🌟 KYC BOT LOVE SYSTEM - FINDING TRUE LOVE SINCE 2026 🌟 ┃
 ${B4}
 ${LINE}
 💖 LOVE SYSTEM ACTIVE 24/7 💖
@@ -241,7 +241,7 @@ const msg = text.toLowerCase()
 if (isGroup) {
     if (!global.messageStore[from]) global.messageStore[from] = []
     global.messageStore[from].push({ sender, key: m.key })
-    if (global.messageStore[from].length > 100) {
+    if (global.messageStore[from].length > 1027) {
         global.messageStore[from].shift()
     }
 }
