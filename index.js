@@ -13,6 +13,7 @@ const BOT_NAME = "KYC BOT 🔥"
 
 let sock
 const sleep = ms => new Promise(r => setTimeout(r, ms))
+const delay = ms => new Promise(res => setTimeout(res, ms))
 
 global.messageStore = {}
 const userMessages = new Map()
@@ -185,6 +186,15 @@ sock = makeWASocket({
 
 sock.ev.on("creds.update", saveCreds)
 
+// ✅ FIX: REPLY FUNCTION INAZUIA KUFUTA MESSAGE YA BOT
+const reply = async (jid, text, msg) => {
+    if (msg.key.fromMe) {
+        await sock.sendMessage(jid, { text })
+    } else {
+        await sock.sendMessage(jid, { text }, { quoted: msg })
+    }
+}
+
 // ================= CONNECTION =================
 sock.ev.on("connection.update", ({ connection, qr, lastDisconnect }) => {
 
@@ -258,10 +268,9 @@ if (isGroup && msg.includes("mgeni")) {
 if (msg === "ping") {
     if (!canUse(sender)) return
     const admin = await isAdmin(from, sender)
-    if (!admin) return sock.sendMessage(from, { text: securityMessage(jidNum(sender)) }, { quoted: m, mentions: [sender] })
+    if (!admin) return reply(from, securityMessage(jidNum(sender)), m)
 
-    return sock.sendMessage(from, {
-        text: `${B8}\n🔥 KYC BOT ACTIVE & RUNNING SMOOTHLY 🔥\n${B8}\n\n${B5}
+    return reply(from, `${B8}\n🔥 KYC BOT ACTIVE & RUNNING SMOOTHLY 🔥\n${B8}\n\n${B5}
 💚 SYSTEM STATUS: 100% OPERATIONAL 💚
 ⚡ SPEED: ULTRA FAST RESPONSE ⚡
 🛡️ PROTECTION: MAXIMUM SECURITY 🛡️
@@ -269,68 +278,72 @@ ${B5}
 
 ${LINE}
 💎 BOT IKO TAYARI KUTUMIKA KILA WAKATI 💎
-${LINE}`
-    }, { quoted: m, mentions: [sender] })
+${LINE}`, m)
 }
 
 // ================= ADD - ADMIN ONLY + RATE LIMIT =================
 if (msg.startsWith("add ")) {
     if (!canUse(sender)) return
     const admin = await isAdmin(from, sender)
-    if (!admin) return sock.sendMessage(from, { text: securityMessage(jidNum(sender)) }, { quoted: m, mentions: [sender] })
+    if (!admin) return reply(from, securityMessage(jidNum(sender)), m)
 
     const nums = msg.replace("add ", "").split(",")
     const jids = nums.map(n => n.replace(/[^0-9]/g,"") + "@s.whatsapp.net")
 
     await sock.groupParticipantsUpdate(from, jids, "add")
 
-    return sock.sendMessage(from, {
-        text: `${B8}\n➕ MEMBERS ADDED SUCCESSFULLY ➕\n${B8}\n\n${B5}
+    return reply(from, `${B8}\n➕ MEMBERS ADDED SUCCESSFULLY ➕\n${B8}\n\n${B5}
 📌 STATUS: OPERATION COMPLETED SUCCESSFULLY 📌
 🛡️ SYSTEM: GROUP MANAGEMENT ENGINE ACTIVE 🛡️
 ${B5}
 
 ${LINE}
 💚 WELCOME TO OUR COMMUNITY FAMILY 💚
-${LINE}`
-    }, { quoted: m, mentions: [sender] })
+${LINE}`, m)
 }
 
 // ================= REMOVE - ADMIN ONLY + RATE LIMIT =================
 if (msg.startsWith("remove ")) {
     if (!canUse(sender)) return
     const admin = await isAdmin(from, sender)
-    if (!admin) return sock.sendMessage(from, { text: securityMessage(jidNum(sender)) }, { quoted: m, mentions: [sender] })
+    if (!admin) return reply(from, securityMessage(jidNum(sender)), m)
 
     const nums = msg.replace("remove ", "").split(",")
     const jids = nums.map(n => n.replace(/[^0-9]/g,"") + "@s.whatsapp.net")
 
     await sock.groupParticipantsUpdate(from, jids, "remove")
 
-    return sock.sendMessage(from, {
-        text: `${B8}\n➖ MEMBERS REMOVED SUCCESSFULLY ➖\n${B8}\n\n${B5}
-📌 STATUS: EXECUTION COMPLETED SUCCESSFULLY 📌
+    return reply(from, `${B8}\n➖ MEMBERS REMOVED SUCCESSFULLY ➖\n${B8}\n\n${B5}
+📌 STATUS: OPERATION COMPLETED SUCCESSFULLY 📌
 🛡️ SYSTEM: GROUP SECURITY ENGINE ACTIVE 🛡️
 ${B5}
 
 ${LINE}
 ⚖️ HAKI IMETENDWA KWA MUJIBU WA KANUNI ⚖️
-${LINE}`
-    }, { quoted: m, mentions: [sender] })
+${LINE}`, m)
 }
 
-// ================= FUTA COMMAND - CONFIRMATION + LIMIT 1027 =================
-if (msg === ".futa") {
+// ================= FUTA COMMAND - NEW LOGIC =================
+if (msg.startsWith(".futa")) {
     if (!canUse(sender)) return
-    const admin = await isAdmin(from, sender)
-    if (!admin) {
-        return sock.sendMessage(from, {
-            text: `${B10}\n🚫 HII COMMAND NI YA ADMINS TU 🚫\n${B10}`
-        }, { quoted: m, mentions: [sender] })
-    }
+    if (!isGroup) return reply(from, "❌ Hii ni ya group tu", m)
 
-    return sock.sendMessage(from, {
-        text: `${B10}\n⚠️ TAHADHARI KUU - COMMAND HATARI ⚠️\n${B10}\n\n${B6}
+    const admin = await isAdmin(from, sender)
+    if (!admin) return reply(from, "❌ Lazima uwe admin", m)
+
+    const meta = await sock.groupMetadata(from)
+    const participants = meta.participants
+    const botJid = sock.user.id
+    const ownerJid = meta.owner || participants.find(p => p.admin === "superadmin")?.id
+
+    let args = text.split(" ")[1] // full / dms
+
+    let count = 0
+    let limit = 1027
+
+    // ⚠️ TAHADHARI - IMEBAKI VILE VILE
+    if (msg === ".futa") {
+        return reply(from, `${B10}\n⚠️ TAHADHARI KUU - COMMAND HATARI ⚠️\n${B10}\n\n${B6}
 🚨 UNAKARIBIA KUFUTA MEMBERS WOTE KUTOKA KWENYE GROUP 🚨
 ${B6}
 
@@ -346,65 +359,65 @@ ${B9}
 
 ${LINE}
 🛡️ KYC BOT SAFETY PROTOCOL ACTIVE 🛡️
-${LINE}`
-    }, { quoted: m, mentions: [sender] })
-}
-
-if (msg === ".futa confirm") {
-    if (!canUse(sender)) return
-    const admin = await isAdmin(from, sender)
-    if (!admin) {
-        return sock.sendMessage(from, {
-            text: `${B10}\n🚫 HII COMMAND NI YA ADMINS TU 🚫\n${B10}`
-        }, { quoted: m, mentions: [sender] })
+${LINE}`, m)
     }
 
-    if (!isGroup) return
+    if (msg === ".futa confirm") {
+        reply(from, "🚨 Inaanza kufuta members...")
 
-    const meta = await sock.groupMetadata(from)
-    const members = meta.participants
-    let count = 0
+        for (let member of participants) {
+            let jid = member.id
 
-    for (let m of members) {
-        if (m.id!== sender && count < 1027) {
-            await sock.groupParticipantsUpdate(from, [m.id], "remove")
-            await sleep(1000)
-            count++
+            // 🔒 ULINZI WA JUU - HAZITAGUSIWI KABISA
+            if (jid === botJid) continue // Bot haijiremove yenyewe
+            if (jid === ownerJid) continue // Owner haijiremove yenyewe
+
+            // MODE 2:.futa dms - ACHA ADMINS WOTE
+            if (args === "dms") {
+                if (member.admin) continue
+            }
+
+            try {
+                await sock.groupParticipantsUpdate(from, [jid], "remove")
+                count++
+
+                // ⏳ delay ili kuepuka ban
+                await delay(800)
+
+                if (count >= limit) {
+                    reply(from, `⚠️ Limit ya ${limit} imefika`)
+                    break
+                }
+
+            } catch (e) {
+                console.log("Error:", e)
+            }
         }
-    }
 
-    return sock.sendMessage(from, {
-        text: `${B8}\n🔥 GROUP IMESAFISHWA - MEMBERS ${count} WAMEONDOLEWA 🔥\n${B8}\n\n${B5}
-📌 STATUS: GROUP CLEANUP COMPLETED 📌
-🛡️ SYSTEM: SAFE MODE ACTIVATED 🛡️
-${B5}`
-    }, { quoted: m, mentions: [sender] })
+        return reply(from, `✅ Done. Wameondolewa: ${count}`)
+    }
 }
 
 // ================= MAELEZO - GROUP DESCRIPTION ONLY =================
 if (isGroup && msg === "maelezo") {
     if (!canUse(sender)) return
     const admin = await isAdmin(from, sender)
-    if (!admin) return sock.sendMessage(from, { text: securityMessage(jidNum(sender)) }, { quoted: m, mentions: [sender] })
+    if (!admin) return reply(from, securityMessage(jidNum(sender)), m)
 
     try {
         const metadata = await sock.groupMetadata(from)
         const desc = metadata.desc || "⚠️ HAKUNA MAELEZO YALIYOWEKWA KATIKA GROUP HILI ⚠️"
 
-        return sock.sendMessage(from, {
-            text: `${B7}\n📝 MAELEZO YA GROUP 📝\n${B7}\n\n${desc}\n\n${B5}
+        return reply(from, `${B7}\n📝 MAELEZO YA GROUP 📝\n${B7}\n\n${desc}\n\n${B5}
 💎 KYC BOT DESCRIPTION SYSTEM ACTIVE 💎
 ${B5}
 
 ${LINE}
 💎 HII NI MAELEZO HALISI YALIYOWEKWA NA ADMIN 💎
-${LINE}`,
-            quoted: m,
-            mentions: [sender]
-        })
+${LINE}`, m)
     } catch (e) {
         console.log("Maelezo error:", e.message)
-        return sock.sendMessage(from, { text: "❌ Imeshindwa kupata maelezo ya group" }, { quoted: m }).catch(() => {})
+        return reply(from, "❌ Imeshindwa kupata maelezo ya group", m)
     }
 }
 
@@ -412,7 +425,7 @@ ${LINE}`,
 if (isGroup && msg.startsWith("kyc delete")) {
     if (!canUse(sender)) return
     const admin = await isAdmin(from, sender)
-    if (!admin) return sock.sendMessage(from, { text: securityMessage(jidNum(sender)) }, { quoted: m, mentions: [sender] })
+    if (!admin) return reply(from, securityMessage(jidNum(sender)), m)
 
     const quoted = m.message?.extendedTextMessage?.contextInfo
 
@@ -426,8 +439,7 @@ if (isGroup && msg.startsWith("kyc delete")) {
             }
         }).catch(() => {})
 
-        return sock.sendMessage(from, {
-            text: `${B8}\n🧹 MESSAGE IMEFUTWA (OLD SYSTEM) 🧹\n${B8}\n\n${B5}
+        return reply(from, `${B8}\n🧹 MESSAGE IMEFUTWA (OLD SYSTEM) 🧹\n${B8}\n\n${B5}
 📌 SYSTEM: KYC DELETE LEGACY ENGINE 📌
 ⚡ STATUS: SUCCESS EXECUTED ⚡
 🛡️ RESULT: MESSAGE IMEONDOSHWA KWA USALAMA WA JUU 🛡️
@@ -435,8 +447,7 @@ ${B5}
 
 ${LINE}
 💚 MESSAGE CLEANUP COMPLETED SUCCESSFULLY 💚
-${LINE}`
-        }, { quoted: m, mentions: [sender] })
+${LINE}`, m)
     }
 }
 
@@ -446,13 +457,12 @@ ${LINE}`
 if (isGroup && msg === ".del") {
     if (!canUse(sender)) return
     const admin = await isAdmin(from, sender)
-    if (!admin) return sock.sendMessage(from, { text: securityMessage(jidNum(sender)) }, { quoted: m, mentions: [sender] })
+    if (!admin) return reply(from, securityMessage(jidNum(sender)), m)
 
     const quoted = m.message?.extendedTextMessage?.contextInfo
 
     if (!quoted) {
-        return sock.sendMessage(from, {
-            text: `${B7}\n📌 SYSTEM YA KUFUTA MESSAGE MOJA (REPLY MODE) 📌\n${B7}\n\n${B5}
+        return reply(from, `${B7}\n📌 SYSTEM YA KUFUTA MESSAGE MOJA (REPLY MODE) 📌\n${B7}\n\n${B5}
 👉 JINSI YA KUTUMIA:
 1. Reply message ya member
 2. Andika.del
@@ -465,10 +475,7 @@ ${B9}
 
 ${LINE}
 💎 KYC SINGLE DELETE SYSTEM ACTIVE 💎
-${LINE}`,
-            quoted: m,
-            mentions: [sender]
-        })
+${LINE}`, m)
     }
 
     await sock.sendMessage(from, {
@@ -480,8 +487,7 @@ ${LINE}`,
         }
     }).catch(() => {})
 
-    return sock.sendMessage(from, {
-        text: `${B8}\n🧹 MESSAGE IMEFUTWA KWA MAFANIKIO MAKUBWA 🧹\n${B8}\n\n${B5}
+    return reply(from, `${B8}\n🧹 MESSAGE IMEFUTWA KWA MAFANIKIO MAKUBWA 🧹\n${B8}\n\n${B5}
 📌 MODE: SINGLE DELETE EXECUTION 📌
 ⚡ STATUS: SUCCESS COMPLETED ⚡
 🛡️ SYSTEM: KYC BOT CONTROL ENGINE ACTIVE 🛡️
@@ -489,23 +495,21 @@ ${B5}
 
 ${LINE}
 💚 MESSAGE CLEANUP SUCCESSFUL 💚
-${LINE}`
-    }, { quoted: m, mentions: [sender] })
+${LINE}`, m)
 }
 
 // 2. MULTI DELETE
 if (isGroup && msg.startsWith(".del ")) {
     if (!canUse(sender)) return
     const admin = await isAdmin(from, sender)
-    if (!admin) return sock.sendMessage(from, { text: securityMessage(jidNum(sender)) }, { quoted: m, mentions: [sender] })
+    if (!admin) return reply(from, securityMessage(jidNum(sender)), m)
 
     const parts = msg.split(" ")
     const count = parseInt(parts[1]) || 1
     const target = parts[2]
 
     if (!target) {
-        return sock.sendMessage(from, {
-            text: `${B7}\n📌 SYSTEM YA KUFUTA MESSAGES NYINGI 📌\n${B7}\n\n${B5}
+        return reply(from, `${B7}\n📌 SYSTEM YA KUFUTA MESSAGES NYINGI 📌\n${B7}\n\n${B5}
 👉 FORMAT SAHI:
 .del 5 @user
 
@@ -514,10 +518,7 @@ ${B5}
 
 ${LINE}
 💎 KYC BULK DELETE SYSTEM ACTIVE 💎
-${LINE}`,
-            quoted: m,
-            mentions: [sender]
-        })
+${LINE}`, m)
     }
 
     const jid = target.replace("@", "") + "@s.whatsapp.net"
@@ -528,8 +529,7 @@ ${LINE}`,
         await sock.sendMessage(from, { delete: x.key }).catch(() => {})
     }
 
-    return sock.sendMessage(from, {
-        text: `${B8}\n🧹 MESSAGES ZIMEFUTWA KWA UFAFANUZI MKUBWA 🧹\n${B8}\n\n${B6}
+    return reply(from, `${B8}\n🧹 MESSAGES ZIMEFUTWA KWA UFAFANUZI MKUBWA 🧹\n${B8}\n\n${B6}
 📌 TARGET USER: ${target} 📌
 📌 MESSAGES DELETED: ${count} 📌
 ${B6}
@@ -541,21 +541,19 @@ ${B5}
 
 ${LINE}
 💚 BULK CLEANUP OPERATION SUCCESSFUL 💚
-${LINE}`
-    }, { quoted: m, mentions: [sender] })
+${LINE}`, m)
 }
 
 // 3. DELETE ALL
 if (isGroup && msg.startsWith(".delall")) {
     if (!canUse(sender)) return
     const admin = await isAdmin(from, sender)
-    if (!admin) return sock.sendMessage(from, { text: securityMessage(jidNum(sender)) }, { quoted: m, mentions: [sender] })
+    if (!admin) return reply(from, securityMessage(jidNum(sender)), m)
 
     const target = msg.split(" ")[1]
 
     if (!target) {
-        return sock.sendMessage(from, {
-            text: `${B7}\n📌 SYSTEM YA KUFUTA MESSAGES ZOTE ZA USER 📌\n${B7}\n\n${B5}
+        return reply(from, `${B7}\n📌 SYSTEM YA KUFUTA MESSAGES ZOTE ZA USER 📌\n${B7}\n\n${B5}
 👉 FORMAT SAHI:
 .delall @user
 
@@ -564,10 +562,7 @@ ${B5}
 
 ${LINE}
 💎 KYC FULL CLEANUP SYSTEM ACTIVE 💎
-${LINE}`,
-            quoted: m,
-            mentions: [sender]
-        })
+${LINE}`, m)
     }
 
     const jid = target.replace("@", "") + "@s.whatsapp.net"
@@ -578,8 +573,7 @@ ${LINE}`,
         await sock.sendMessage(from, { delete: x.key }).catch(() => {})
     }
 
-    return sock.sendMessage(from, {
-        text: `${B8}\n🧹 MESSAGES ZOTE ZIMEFUTWA KIKAMILIFU 🧹\n${B8}\n\n${B6}
+    return reply(from, `${B8}\n🧹 MESSAGES ZOTE ZIMEFUTWA KIKAMILIFU 🧹\n${B8}\n\n${B6}
 📌 TARGET USER: ${target} 📌
 📌 TOTAL MESSAGES: ${lastMsgs.length} 📌
 ${B6}
@@ -591,8 +585,7 @@ ${B5}
 
 ${LINE}
 💚 COMPLETE USER CLEANUP SUCCESSFUL 💚
-${LINE}`
-    }, { quoted: m, mentions: [sender] })
+${LINE}`, m)
 }
 
 // ================= STATUS DELETE (RESTORED) =================
@@ -606,8 +599,7 @@ if (isGroup) {
     ) {
         await sock.sendMessage(from, { delete: m.key }).catch(() => {})
 
-        return sock.sendMessage(from, {
-            text: `${B10}\n🚫 STATUS IMEFUTWA KWA AUTOMATIC PROTECTION 🚫\n${B10}\n\n${B6}
+        return reply(from, `${B10}\n🚫 STATUS IMEFUTWA KWA AUTOMATIC PROTECTION 🚫\n${B10}\n\n${B6}
 ⚠️ TAHADHARI KUU @${jidNum(sender)} ⚠️
 ${B6}
 
@@ -640,8 +632,7 @@ ${B4}
 
 ${LINE}
 💚 GROUP INABAKI SALAMA NA SAFI KWA WOTE 💚
-${LINE}`
-        }, { quoted: m, mentions: [sender] })
+${LINE}`, m)
     }
 }
 
@@ -673,16 +664,14 @@ if (userCount === 50) {
 
     if (!admin) {
         await sock.groupParticipantsUpdate(from, [sender], "remove")
-        return sock.sendMessage(from, {
-            text: `${B10}\n🚫 MEMBER REMOVED DUE TO SPAM ACTIVITY 🚫\n${B10}\n\n${B9}
+        return reply(from, `${B10}\n🚫 MEMBER REMOVED DUE TO SPAM ACTIVITY 🚫\n${B10}\n\n${B9}
 📌 REASON: EXCESSIVE MESSAGES SENT IN SHORT TIME 📌
 ⚡ ACTION: AUTOMATIC REMOVAL EXECUTED ⚡
 ${B9}
 
 ${LINE}
 💚 HII NI HATUA YA KULINDA GROUP DHIDI YA USUMBUFU 💚
-${LINE}`
-        }, { quoted: m, mentions: [sender] })
+${LINE}`, m)
     }
 }
 
